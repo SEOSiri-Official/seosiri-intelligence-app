@@ -41,7 +41,7 @@ def analyze_strategy(
 
     try:
         genai.configure(api_key=x_gemini_api_key)
-        model = genai.GenerativeModel('gemini-pro')
+model = genai.GenerativeModel('gemini-1.5-flash-latest')
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"API Key configuration error: {str(e)}")
 
