@@ -14,6 +14,7 @@
         .btn { background: #3b82f6; color: white; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; transition: 0.2s; }
         .btn:hover { background: #2563eb; }
         .btn:disabled { background: #475569; cursor: not-allowed; }
+        .hidden { display: none; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -32,17 +33,16 @@
 
     <main class="flex-grow container mx-auto px-4 py-8 max-w-4xl">
         
-        <!-- API Key Section -->
         <div class="glass rounded-xl p-6 mb-8">
             <h2 class="text-lg font-semibold text-white mb-4"><i class="fa-solid fa-lock mr-2 text-green-400"></i>1. Configuration</h2>
             <div class="flex gap-4 items-center">
                 <input type="password" id="apiKey" class="input-std flex-grow" placeholder="Enter Google Gemini API Key">
                 <button onclick="saveKey()" id="connectBtn" class="btn">Connect</button>
+                <button onclick="changeKey()" id="changeBtn" class="btn bg-slate-600 hover:bg-slate-700 hidden">Change Key</button>
             </div>
-            <p class="text-xs text-slate-500 mt-2">Your key is stored locally in your browser only. We do not save it.</p>
+            <p class="text-xs text-slate-500 mt-2">Your key is stored in your browser's local storage only.</p>
         </div>
 
-        <!-- Strategy Input -->
         <div class="glass rounded-xl p-6 mb-8">
             <h2 class="text-lg font-semibold text-white mb-4"><i class="fa-solid fa-lightbulb mr-2 text-yellow-400"></i>2. Intelligence Inputs</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -52,11 +52,11 @@
                 </div>
                 <div>
                     <label class="text-sm text-slate-400 mb-1 block">Competitor URL</label>
-<input type="text" id="competitor" class="input-std" placeholder="e.g., competitor.com">
+                    <input type="text" id="competitor" class="input-std" placeholder="https://competitor.com">
                 </div>
                 <div class="col-span-1 md:col-span-2">
                     <label class="text-sm text-slate-400 mb-1 block">Target Persona</label>
-                    <textarea id="persona" class="input-std h-24" placeholder="e.g. Marketing Directors looking for automation..."></textarea>
+                    <textarea id="persona" class="input-std h-24" placeholder="e.g. Marketing Directors at SaaS companies..."></textarea>
                 </div>
             </div>
             <div class="mt-6 text-right">
@@ -66,10 +66,9 @@
             </div>
         </div>
 
-        <!-- Results -->
         <div id="resultsArea" class="hidden glass rounded-xl p-6 border-l-4 border-green-500">
             <h2 class="text-xl font-bold text-white mb-4">Intelligence Report</h2>
-            <pre id="outputContent" class="prose prose-invert max-w-none text-slate-300 whitespace-pre-wrap font-mono text-sm bg-slate-900 p-4 rounded"></pre>
+            <pre id="outputContent" class="text-slate-300 whitespace-pre-wrap font-mono text-sm bg-slate-900 p-4 rounded"></pre>
         </div>
     </main>
 
@@ -80,10 +79,10 @@
     <script>
         const apiKeyInput = document.getElementById('apiKey');
         const connectBtn = document.getElementById('connectBtn');
+        const changeBtn = document.getElementById('changeBtn');
         const runBtn = document.getElementById('runBtn');
         const apiStatus = document.getElementById('api-status');
 
-        // Check for saved key on page load
         document.addEventListener('DOMContentLoaded', () => {
             const savedKey = localStorage.getItem('gemini_key');
             if (savedKey) {
@@ -97,30 +96,37 @@
             if (key) {
                 localStorage.setItem('gemini_key', key);
                 updateStatus(true);
-                alert('API Key saved and connected!');
+                alert('API Key connected!');
             } else {
                 alert('Please enter a valid API Key.');
-                updateStatus(false);
             }
+        }
+
+        function changeKey() {
+            localStorage.removeItem('gemini_key');
+            apiKeyInput.value = '';
+            updateStatus(false);
         }
 
         function updateStatus(isConnected) {
             if (isConnected) {
                 apiStatus.innerHTML = '<i class="fa-solid fa-check text-green-400"></i> System Ready';
                 runBtn.disabled = false;
-                connectBtn.textContent = 'Connected';
-                connectBtn.disabled = true;
+                connectBtn.classList.add('hidden');
+                changeBtn.classList.remove('hidden');
+                apiKeyInput.disabled = true;
             } else {
                 apiStatus.innerHTML = '<i class="fa-solid fa-key text-red-400"></i> Key Not Connected';
                 runBtn.disabled = true;
+                connectBtn.classList.remove('hidden');
+                changeBtn.classList.add('hidden');
+                apiKeyInput.disabled = false;
             }
         }
 
         async function runAnalysis() {
             const key = localStorage.getItem('gemini_key');
-            if (!key) {
-                return alert('API Key is not connected. Please enter your key and click "Connect".');
-            }
+            if (!key) return alert('API Key not connected.');
 
             runBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Analyzing...';
             runBtn.disabled = true;
@@ -135,38 +141,29 @@
                 persona: document.getElementById('persona').value
             };
 
+            const apiUrl = 'https://seosiri-intelligence-app.onrender.com/api/analyze';
+            
             try {
-                const apiUrl = 'https://backend-frosty-violet-5653.fly.dev/analyze';
-                
                 const response = await fetch(apiUrl, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-gemini-api-key': key
-                    },
+                    headers: { 'Content-Type': 'application/json', 'x-gemini-api-key': key },
                     body: JSON.stringify(payload)
                 });
 
                 const data = await response.json();
 
-                if (response.ok) {
-                    // SUCCESS
-                    try {
-                        const jsonResult = JSON.parse(data.result.replace(/```json/g, '').replace(/```/g, ''));
-                        outputEl.textContent = JSON.stringify(jsonResult, null, 2);
-                    } catch (e) {
-                        outputEl.textContent = data.result; // Show as plain text if not JSON
-                    }
-                } else {
-                    // ERROR from backend
-                    outputEl.textContent = `Error ${response.status}: ${data.detail || 'An unknown error occurred on the backend.'}`;
+                if (!response.ok) {
+                    throw new Error(`Backend Error (${response.status}): ${data.detail || 'Unknown error'}`);
                 }
 
+                const jsonResult = JSON.parse(data.result);
+                outputEl.textContent = JSON.stringify(jsonResult, null, 2);
+
             } catch (error) {
-                outputEl.textContent = 'A network error occurred: ' + error.message + '\n\nThis usually means the backend server is offline or a CORS issue.';
+                outputEl.textContent = 'Error: ' + error.message;
             } finally {
                 runBtn.innerHTML = '<i class="fa-solid fa-bolt mr-2"></i> Run SEOSiri Analysis';
-                runBtn.disabled = false; // Re-enable the button even on error
+                runBtn.disabled = false;
             }
         }
     </script>

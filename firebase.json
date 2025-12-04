@@ -6,11 +6,15 @@
       "**/.*",
       "**/node_modules/**"
     ],
-    "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ]
+   "rewrites": [
+  {
+    "source": "/api/**",
+    "destination": "https://seosiri-intelligence-app.onrender.com/api/**"
+  },
+  {
+    "source": "**",
+    "destination": "/index.html"
+  }
+]
   }
 }
